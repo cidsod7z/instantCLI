@@ -1,64 +1,72 @@
 name: CI
-run-name: "CI: ${{ github.event.head_commit.message || github.event.pull_request.title }}"
-on:
+run-name: 'CI: ${{ github.event.head_commit.message || github.event.pull_request.title
+  }}'
+'on':
   push:
     branches:
-      - main
-      - release
-  pull_request:
+    - main
+    - release
+  pull_request: null
 jobs:
   test:
     name: Test and build on Arch Linux
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     container:
       image: archlinux:latest
     env:
       CARGO_TERM_COLOR: always
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Initialise pacman
-        run: |
-          pacman-key --init
-          pacman-key --populate archlinux
-          pacman -Syu --noconfirm
-      - name: Install build dependencies
-        run: |
-          pacman -S --noconfirm --needed base-devel rust pkgconf openssl git cmake restic jq
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          # Cache key includes target architecture and important env vars
-          key: arch-cargo-${{ hashFiles('**/Cargo.lock') }}
-          # Use prefix to distinguish from other jobs/environments
-          prefix-key: arch-test
-          # Cache validation ensures correctness across Rust versions
-          cache-all-crates: true
-          # Don't cache ~/.cargo/bin — restoring old rustup proxies shadows pacman-installed rust
-          cache-bin: "false"
-      - name: Clean leaked rustup from shared HOME
-        run: |
-          # The self-hosted runner shares HOME=/github/home across container jobs.
-          # Release-plz (Ubuntu) installs rustup there, which interferes with
-          # Arch's pacman-installed cargo-fmt (it detects ~/.rustup and tries
-          # rustup toolchain resolution instead of using /usr/bin/rustfmt).
-          rm -rf ~/.rustup ~/.cargo/bin
-      - name: Check code formatting
-        run: cargo fmt -- --check
-      - name: Run clippy lints
-        run: cargo clippy --all-targets --all-features
-      - name: Run unit tests
-        run: cargo test --locked --verbose
-      - name: Build debug binary for integration tests
-        run: cargo build --locked
-      - name: Run integration tests
-        run: |
-          # Make test scripts executable
-          chmod +x tests/*.sh
-          ./tests/run_all.sh
-      - name: Check binary functionality
-        run: |
-          # Test basic CLI functionality
-          ./target/debug/ins --help > /dev/null
-          ./target/debug/ins --version
-          echo "✓ CLI binary basic functionality works"
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Initialise pacman
+      run: 'pacman-key --init
+
+        pacman-key --populate archlinux
+
+        pacman -Syu --noconfirm
+
+        '
+    - name: Install build dependencies
+      run: 'pacman -S --noconfirm --needed base-devel rust pkgconf openssl git cmake
+        restic jq
+
+        '
+    - name: Rust cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        key: arch-cargo-${{ hashFiles('**/Cargo.lock') }}
+        prefix-key: arch-test
+        cache-all-crates: true
+        cache-bin: 'false'
+    - name: Clean leaked rustup from shared HOME
+      run: '# The self-hosted runner shares HOME=/github/home across container jobs.
+
+        # Release-plz (Ubuntu) installs rustup there, which interferes with
+
+        # Arch''s pacman-installed cargo-fmt (it detects ~/.rustup and tries
+
+        # rustup toolchain resolution instead of using /usr/bin/rustfmt).
+
+        rm -rf ~/.rustup ~/.cargo/bin
+
+        '
+    - name: Check code formatting
+      run: cargo fmt -- --check
+    - name: Run clippy lints
+      run: cargo clippy --all-targets --all-features
+    - name: Run unit tests
+      run: cargo test --locked --verbose
+    - name: Build debug binary for integration tests
+      run: cargo build --locked
+    - name: Run integration tests
+      run: '# Make test scripts executable
+
+        chmod +x tests/*.sh
+
+        ./tests/run_all.sh
+
+        '
+    - name: Check binary functionality
+      run: "# Test basic CLI functionality\n./target/debug/ins --help > /dev/null\n\
+        ./target/debug/ins --version\necho \"\u2713 CLI binary basic functionality\
+        \ works\"\n"
