@@ -1,15 +1,16 @@
 name: Sync PKGBUILD version
-run-name: "Sync PKGBUILD: ${{ github.event.pull_request.title }}"
-on:
+run-name: 'Sync PKGBUILD: ${{ github.event.pull_request.title }}'
+'on':
   pull_request_target:
     types:
-      - opened
-      - synchronize
-      - reopened
+    - opened
+    - synchronize
+    - reopened
 jobs:
   sync:
-    if: github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, 'release-plz-')
-    runs-on: self-hosted
+    if: github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref,
+      'release-plz-')
+    runs-on: ubuntu-latest
     container:
       image: archlinux:latest
     defaults:
@@ -18,64 +19,51 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Install dependencies
-        run: |
-          pacman -Syu --noconfirm
-          pacman -S --noconfirm --needed git python pacman-contrib sudo
-      - name: Create builder user
-        run: |
-          useradd -m builder
-          echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
-          chmod 440 /etc/sudoers.d/builder
-      - name: Checkout release PR branch
-        uses: actions/checkout@v5
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
-      - name: Configure git user
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-      - name: Sync PKGBUILD version
-        run: |
-          set -euo pipefail
+    - name: Install dependencies
+      run: 'pacman -Syu --noconfirm
 
-          # Check for merge conflict markers in Cargo.toml before parsing
-          if grep -q "<<<<<<<\|=======\|>>>>>>>" Cargo.toml; then
-            echo "Error: Cargo.toml contains merge conflict markers. Cannot parse version."
-            echo "Please resolve merge conflicts before running sync-pkgbuild."
-            exit 1
-          fi
+        pacman -S --noconfirm --needed git python pacman-contrib sudo
 
-          version="$(python3 - <<'PY'
-          import sys
+        '
+    - name: Create builder user
+      run: 'useradd -m builder
 
-          try:
-              import tomllib  # Python 3.11+
-          except ModuleNotFoundError:  # pragma: no cover - fallback for older interpreters
-              import tomli as tomllib
+        echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
 
-          with open("Cargo.toml", "rb") as f:
-              data = tomllib.load(f)
+        chmod 440 /etc/sudoers.d/builder
 
-          print(data["package"]["version"])
-          PY
-          )"
-          pkgbuild_file="pkgbuild/ins/PKGBUILD"
-          file_version="$(awk -F '=' '/^pkgver=/ {print $2; exit}' "$pkgbuild_file")"
-          pkgrel="$(awk -F '=' '/^pkgrel=/ {print $2; exit}' "$pkgbuild_file")"
-          if [[ "$file_version" != "$version" ]]; then
-            sed -i "s/^pkgver=.*/pkgver=$version/" "$pkgbuild_file"
-            sed -i "s/^pkgrel=.*/pkgrel=1/" "$pkgbuild_file"
-          fi
-          if ! git diff --quiet "$pkgbuild_file"; then
-            # Copy PKGBUILD to builder's home and generate .SRCINFO as builder user
-            cp "$pkgbuild_file" /home/builder/PKGBUILD
-            chown builder:builder /home/builder/PKGBUILD
-            srcinfo="$(su builder -c 'cd /home/builder && makepkg --printsrcinfo -p PKGBUILD')"
-            printf '%s\n' "$srcinfo" > pkgbuild/ins/.SRCINFO
-            git add "$pkgbuild_file" pkgbuild/ins/.SRCINFO
-            git commit -m "chore: sync PKGBUILD version"
-            git push
-          fi
+        '
+    - name: Checkout release PR branch
+      uses: actions/checkout@v5
+      with:
+        repository: ${{ github.event.pull_request.head.repo.full_name }}
+        ref: ${{ github.event.pull_request.head.ref }}
+    - name: Configure git user
+      run: 'git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+        git config user.name "github-actions[bot]"
+
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        '
+    - name: Sync PKGBUILD version
+      run: "set -euo pipefail\n\n# Check for merge conflict markers in Cargo.toml\
+        \ before parsing\nif grep -q \"<<<<<<<\\|=======\\|>>>>>>>\" Cargo.toml; then\n\
+        \  echo \"Error: Cargo.toml contains merge conflict markers. Cannot parse\
+        \ version.\"\n  echo \"Please resolve merge conflicts before running sync-pkgbuild.\"\
+        \n  exit 1\nfi\n\nversion=\"$(python3 - <<'PY'\nimport sys\n\ntry:\n    import\
+        \ tomllib  # Python 3.11+\nexcept ModuleNotFoundError:  # pragma: no cover\
+        \ - fallback for older interpreters\n    import tomli as tomllib\n\nwith open(\"\
+        Cargo.toml\", \"rb\") as f:\n    data = tomllib.load(f)\n\nprint(data[\"package\"\
+        ][\"version\"])\nPY\n)\"\npkgbuild_file=\"pkgbuild/ins/PKGBUILD\"\nfile_version=\"\
+        $(awk -F '=' '/^pkgver=/ {print $2; exit}' \"$pkgbuild_file\")\"\npkgrel=\"\
+        $(awk -F '=' '/^pkgrel=/ {print $2; exit}' \"$pkgbuild_file\")\"\nif [[ \"\
+        $file_version\" != \"$version\" ]]; then\n  sed -i \"s/^pkgver=.*/pkgver=$version/\"\
+        \ \"$pkgbuild_file\"\n  sed -i \"s/^pkgrel=.*/pkgrel=1/\" \"$pkgbuild_file\"\
+        \nfi\nif ! git diff --quiet \"$pkgbuild_file\"; then\n  # Copy PKGBUILD to\
+        \ builder's home and generate .SRCINFO as builder user\n  cp \"$pkgbuild_file\"\
+        \ /home/builder/PKGBUILD\n  chown builder:builder /home/builder/PKGBUILD\n\
+        \  srcinfo=\"$(su builder -c 'cd /home/builder && makepkg --printsrcinfo -p\
+        \ PKGBUILD')\"\n  printf '%s\\n' \"$srcinfo\" > pkgbuild/ins/.SRCINFO\n  git\
+        \ add \"$pkgbuild_file\" pkgbuild/ins/.SRCINFO\n  git commit -m \"chore: sync\
+        \ PKGBUILD version\"\n  git push\nfi\n"
